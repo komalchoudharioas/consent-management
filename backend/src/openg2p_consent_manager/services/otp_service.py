@@ -1,10 +1,8 @@
-"""One-time codes for the aggregation flow.
+"""One-time codes for the consent screen.
 
-This is the second factor the async flow adds: a valid partner consent is no
-longer enough on its own - the subject must also prove, at the moment of the
-request, that they hold the registered identity. Nothing else in the Consent
-Manager does this; ``AuthContext.auth_method`` records ``amr`` from an ID token
-and is enforced nowhere.
+When a partner's policy sets ``required_auth_method = "otp"`` the subject must
+prove, where they grant, that they hold the registered identity: ``approve``
+refuses an AuthContext whose ``auth_method`` is anything else.
 
 The mechanism itself lives in ``otp_provider``, chosen by config:
 
@@ -12,7 +10,7 @@ The mechanism itself lives in ``otp_provider``, chosen by config:
     otp_provider = internal    the same without the Fayda framing
 
 This class is the seam the rest of the service talks to, so swapping backends
-never reaches the aggregator, the controller, or the callback.
+never reaches the lifecycle service or the controller.
 """
 import logging
 

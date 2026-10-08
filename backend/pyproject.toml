@@ -27,11 +27,6 @@ dependencies = [
   # Only used when otp_publish_enabled: writes each issued OTP to an S3 /
   # MinIO bucket as a dev-only stand-in for an SMS gateway.
   "boto3",
-  # The aggregation fan-out and callback queues. Imported lazily and only
-  # touched when kafka_enabled is true, so a deployment with no broker pays
-  # nothing for it being installed. Same client the platform's Audit Manager
-  # uses, so one Kafka skill set covers both.
-  "aiokafka >=0.10",
 ]
 dynamic = ["version"]
 

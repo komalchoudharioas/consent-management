@@ -47,8 +47,8 @@ services:
     environment:
       # CM receipt signing key. Without a persistent key, crypto_service mints an
       # EPHEMERAL key per worker at startup: receipts stop verifying across
-      # workers/restarts, and the aggregator's public key could never be
-      # registered in Partner Management. Dev-grade but persistent. Replace with
+      # workers/restarts, so a receipt verifies only against the worker that
+      # signed it. Dev-grade but persistent. Replace with
       # your own key (or a .p12 via CONSENT_MANAGER_CM_SIGNING_P12_PATH) for prod.
       CONSENT_MANAGER_CM_SIGNING_PRIVATE_KEY_PEM: |
         -----BEGIN PRIVATE KEY-----

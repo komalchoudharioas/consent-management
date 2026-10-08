@@ -1,16 +1,14 @@
 """Turn the one-time code on or off for a partner, and show where it stands.
 
 The OTP is a property of the partner, not of the flow: ``required_auth_method``
-on the partner's active policy decides both gates a request can meet — the
-consent screen, when the subject has never been asked, and the fetch itself,
-when they already consented. A request only ever meets one of them.
+on the partner's active policy decides whether the subject must enter a
+one-time code on the consent screen before ``approve`` will accept their grant.
 
-    ~/agg-venv/bin/python set-partner-otp.py                    # show every partner
-    ~/agg-venv/bin/python set-partner-otp.py komal-aggregator on
-    ~/agg-venv/bin/python set-partner-otp.py komal-aggregator off
+    python set-partner-otp.py                    # show every partner
+    python set-partner-otp.py <audience> on
+    python set-partner-otp.py <audience> off
 
-Run it against :8100. The Docker backend on :8000 is older code and drops the
-field silently, leaving the policy looking set when it is not.
+Point it at another Consent Manager with G2P_CM (default http://localhost:8000).
 
 Turning it OFF is a widening — the partner reaches the same data with less proof
 from the subject — so with AWE enabled the new version lands ``pending`` and the
@@ -23,7 +21,7 @@ import time
 
 import httpx
 
-CM = os.environ.get("G2P_CM", "http://localhost:8100")
+CM = os.environ.get("G2P_CM", "http://localhost:8000")
 KEYCLOAK = os.environ.get(
     "G2P_KEYCLOAK", "http://localhost:8080") + "/realms/staff/protocol/openid-connect/token"
 
@@ -71,8 +69,7 @@ def main():
         for p in sorted(rows, key=lambda r: r.get("audience") or ""):
             pol = active_policy(H, p["id"])
             if pol is None:
-                # Distinct from OFF: no policy at all means the aggregator
-                # fails closed and still demands a code, and /validate treats
+                # Distinct from OFF: no policy at all means /validate treats
                 # the partner as having no permissions whatsoever.
                 state = "no active policy"
             else:
@@ -98,7 +95,7 @@ def main():
 
     pol = active_policy(H, pid)
     if pol is None:
-        sys.exit("partner %s has no active policy; run register-aggregator.py first"
+        sys.exit("partner %s has no active policy; create one first"
                  % audience)
     now = pol.get("required_auth_method")
     if (now == "otp") == (want == "on"):

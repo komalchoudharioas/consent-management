@@ -42,12 +42,10 @@ class PolicyUpsert(BaseModel):
     fetch_type: str = "oneshot"
     max_fetch_frequency: Optional[str] = None
     data_life: Optional[str] = Field(None, examples=["P30D"])
-    # How this partner's subjects must prove who they are. One setting, two
-    # gates, and a request only ever meets one of them: the consent screen when
-    # the subject has never been asked, the fetch itself when they already
-    # consented. "otp" demands a one-time code at whichever gate applies; None
-    # means an OIDC id_token is enough on the screen and the fetch proceeds on
-    # the standing consent alone.
+    # How this partner's subjects must prove who they are on the consent
+    # screen. "otp" demands a one-time code before approve accepts the grant;
+    # None means an OIDC id_token is enough. Readable through the policy API,
+    # so a service fetching on the partner's behalf can apply the same rule.
     required_auth_method: Optional[str] = Field(
         None, examples=["otp"],
         description='"otp" or null. Anything else is rejected.')
@@ -93,7 +91,7 @@ class PolicyUpsert(BaseModel):
     def _known_auth_method(cls, v):
         """Reject anything but "otp"/null instead of storing it.
 
-        Both gates test ``== "otp"``, so an unrecognised value - "OTP", "sms", a
+        Every check tests ``== "otp"``, so an unrecognised value - "OTP", "sms", a
         stray space - would read as "no authentication required" and quietly
         remove a factor. A policy field that disables a control when it is
         misspelled has to fail loudly, so the empty string and case are
@@ -128,9 +126,9 @@ class PolicyResponse(PolicyUpsert):
         The upsert's rule stops a bad combination from being WRITTEN. Applied
         to a row already in the table it made the whole policy list a 500, so
         one legacy row hid every version of that partner's policy. Under a
-        non-consent basis nothing reads required_auth_method (seek sets
-        otp_required=False before any gate looks at it), so null is what is
-        actually in force - and what this reports. The startup migration
+        non-consent basis no subject is asked anything, so nothing reads
+        required_auth_method and null is what is actually in force - and what
+        this reports. The startup migration
         clears the column itself.
         """
         if self.lawful_basis != "consent" and self.required_auth_method:

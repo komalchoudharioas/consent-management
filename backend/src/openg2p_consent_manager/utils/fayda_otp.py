@@ -10,8 +10,8 @@ Why in-process rather than another service:
 
 - **State survives.** The original keeps transactions in a module-level dict, so
   a restart loses every one of them and a verify then answers
-  ``404 Unknown transactionID``. Here the transaction IS the aggregation row, so
-  it is as durable as the request it belongs to.
+  ``404 Unknown transactionID``. Here the transaction IS the consent-request
+  row, so it is as durable as the request it belongs to.
 - **Nothing to deploy, nothing to reach.** No container, no port, no network
   path to get wrong, and no second place for the demo to break.
 - **The code never crosses a wire.** The original returns the OTP to nobody and

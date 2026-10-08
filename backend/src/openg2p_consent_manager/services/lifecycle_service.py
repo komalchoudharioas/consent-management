@@ -182,10 +182,10 @@ class LifecycleService(BaseService):
 
             ctx = AuthContext(
                 consent_request_id=request_id,
-                auth_provider=req.otp_provider or _config.aggregator_issuer,
+                auth_provider=req.otp_provider or "otp",
                 auth_method="otp",
                 auth_timestamp=req.otp_verified_at or datetime.now(timezone.utc),
-                issuer=req.otp_provider or _config.aggregator_issuer,
+                issuer=req.otp_provider or "otp",
                 # There is no ID token in this path. The column is not nullable,
                 # so it carries a hash that identifies the act without implying a
                 # token existed; token_validated stays False for the same reason.
@@ -266,13 +266,6 @@ class LifecycleService(BaseService):
             session.add(receipt)
             await session.commit()
             await session.refresh(artefact)
-
-        # An aggregated fetch may have been waiting on exactly this grant. The
-        # import is local because the aggregator depends on this service, not
-        # the other way round — a module-level import would be a cycle.
-        from .aggregator_service import AggregatorService
-
-        await AggregatorService.get_component().release_for_consent_request(request_id)
         return artefact
 
     async def deny(self, request_id: str, reason: Optional[str]) -> ConsentRequest:

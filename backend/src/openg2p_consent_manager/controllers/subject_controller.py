@@ -55,8 +55,8 @@ class SubjectController(BaseController):
             "/consents/{consent_id}", self.get_my_consent,
             responses={200: {"model": ArtefactResponse}}, methods=["GET"],
         )
-        # What was done under one consent: the per-registry grants the
-        # aggregator minted from it and each time data actually moved.
+        # What was done under one consent: each time data actually moved
+        # under it (the access records /validate wrote).
         self.router.add_api_route(
             "/consents/{consent_id}/activity", self.list_my_consent_activity,
             responses={200: {"model": List[ArtefactResponse]}}, methods=["GET"],
@@ -78,8 +78,8 @@ class SubjectController(BaseController):
         view: str = Query(VIEW_ALL, pattern="^(all|consents)$"),
     ) -> Paginated[ArtefactResponse]:
         """``view=all`` (default) lists every artefact, as this route always has.
-        ``view=consents`` lists only the subject's decisions; the grants and
-        access records under each are counted in ``activity_count`` and listed
+        ``view=consents`` lists only the subject's decisions; the access
+        records under each are counted in ``activity_count`` and listed
         by ``/consents/{id}/activity``."""
         result = await self.consents.list_subject_consents(
             subject["subject_id_type"], subject["subject_id_value"],

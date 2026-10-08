@@ -4,7 +4,7 @@ This mirrors the OAN Gen 1 / A2C arrangement, where the Odoo consent module
 drops each generated OTP into the ``a2c-webhook`` bucket under ``otp/`` and a
 tester reads it from there. The A2C Postman collection only ever *reads* that
 bucket (both helpers are ``noauth``); the writing is done server-side, which is
-what this module does for the aggregator.
+what this module does for the consent screen's OTP.
 
 The payload and the key are byte-compatible with theirs::
 
@@ -140,8 +140,8 @@ class OtpPublisher(BaseService):
         now = datetime.now(timezone.utc)
         payload = {
             # Upper-cased hex, as the Gen 1 service formats it.
-            "transactionID": (request.otp_reference or request.correlation_id
-                              or request.id or "").replace("-", "").upper(),
+            "transactionID": (request.otp_reference or request.id
+                              or "").replace("-", "").upper(),
             "otp": code,
             "individualId": individual_id or request.otp_destination
                             or request.subject_id_value,
@@ -150,7 +150,7 @@ class OtpPublisher(BaseService):
             # Ours, not A2C's - lets a reader tie the file back to the request
             # it belongs to without guessing. Extra keys are ignored by their
             # collection, which reads only otp and transactionID.
-            "aggregationId": request.id,
+            "requestId": request.id,
         }
         key = self._key(now)
         body = json.dumps(payload, indent=2).encode("utf-8")

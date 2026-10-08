@@ -44,9 +44,7 @@ class ConsentRequest(BaseORMModelWithId):
 
     # ── OTP authentication ──────────────────────────────────────────────────
     # The subject proves possession of their registered identity HERE, on the
-    # consent screen, rather than a second time later in the fetch flow. These
-    # are deliberately the same column names AggregationRequest uses, so
-    # ``otp_provider`` works on either object without knowing which it holds.
+    # consent screen. ``services/otp_provider`` reads and writes these columns.
     # The code itself is never stored — only its hash.
     otp_hash: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     otp_expires_at: Mapped[Optional[datetime]] = mapped_column(
@@ -58,7 +56,8 @@ class ConsentRequest(BaseORMModelWithId):
     otp_destination: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     otp_provider: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     otp_reference: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    # DEV ONLY, written only when otp_debug_enabled — see AggregationRequest.
+    # DEV ONLY: the plaintext code, written only when otp_debug_enabled and
+    # cleared once it is spent.
     otp_debug_code: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
 
 

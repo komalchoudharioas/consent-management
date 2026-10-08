@@ -46,11 +46,9 @@ export interface PolicyUpsert {
   fetch_type: FetchType;
   max_fetch_frequency?: string | null;
   data_life?: string | null;
-  // How this partner's subjects must prove who they are. One setting, two
-  // gates, and a request only ever meets one of them: the consent screen when
-  // the subject has never been asked, the fetch itself when they already
-  // consented. Null means an id_token is enough on the screen, and a fetch
-  // proceeds on the standing consent with no second factor.
+  // How this partner's subjects must prove who they are on the consent
+  // screen. "otp" demands a one-time code before approval; null means an
+  // id_token is enough.
   required_auth_method?: AuthMethod;
   // WHY this partner may hold the data — a different question from how the
   // subject proves who they are. "consent" needs a subject grant;
@@ -136,9 +134,9 @@ export interface Artefact {
   valid_until: string;
   created_at: string;
   revoked_at?: string | null;
-  // Subject routes only. `consent` is a decision; `registry_grant` and
-  // `access` are what the aggregator did under one, and point at it.
-  record_kind?: "consent" | "registry_grant" | "access" | null;
+  // Subject routes only. `consent` is a decision; `access` records each time
+  // data moved under one, and points at it.
+  record_kind?: "consent" | "access" | null;
   derived_from?: string | null;
   activity_count?: number | null;
   partner_name?: string | null;

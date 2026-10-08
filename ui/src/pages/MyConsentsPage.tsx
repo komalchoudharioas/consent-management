@@ -24,10 +24,9 @@ type Row =
   | { kind: "artefact"; id: string; status: string; partner: string; purpose: Purpose;
       scopes: string[]; at: string; validUntil?: string | null; art: Artefact };
 
-// What an aggregated fetch writes under the subject's one decision. Shown as
+// What a partner's fetches write under the subject's one decision. Shown as
 // the consent's history by default; as their own rows when asked for.
 const RECORD_LABEL: Record<string, string> = {
-  registry_grant: "Registry grant",
   access: "Data access",
 };
 
@@ -60,9 +59,9 @@ const FILTERS: {
 export default function MyConsentsPage() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<FilterKey>("all");
-  // One OTP-approved aggregated fetch writes a consent plus a grant and an
-  // access record per registry. By default those sit under the consent as its
-  // history; this puts them back in the list as rows of their own.
+  // Every fetch a partner makes under a consent writes an access record. By
+  // default those sit under the consent as its history; this puts them back
+  // in the list as rows of their own.
   const [showSystem, setShowSystem] = useState(false);
   const view = showSystem ? "all" : "consents";
 
@@ -162,7 +161,7 @@ export default function MyConsentsPage() {
         />
         Show system records
         <span className="muted">
-          — the registry grants and data-access records behind each consent, as separate rows
+          — the data-access records behind each consent, as separate rows
         </span>
       </label>
 
@@ -406,8 +405,7 @@ function ArtefactCard({
   );
 }
 
-/** What was done under one consent: the grant each registry was given and
- *  every time data actually moved. Read-only - the consent above is what the
+/** What was done under one consent: every time data actually moved. Read-only - the consent above is what the
  *  subject acts on, and withdrawing it is what stops all of this. */
 function ConsentActivity({ consentId }: { consentId: string }) {
   const { data, isLoading, error } = useQuery({
@@ -422,7 +420,7 @@ function ConsentActivity({ consentId }: { consentId: string }) {
         <tr>
           <th>When</th>
           <th>Record</th>
-          <th>Registry</th>
+          <th>Partner</th>
           <th>Data</th>
           <th>Status</th>
         </tr>

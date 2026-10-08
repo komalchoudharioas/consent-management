@@ -82,9 +82,9 @@ class ArtefactResponse(BaseModel):
     valid_until: datetime
     created_at: datetime
     revoked_at: Optional[datetime] = None
-    # Set on the subject routes only. What the row is (consent | registry_grant
-    # | access), the consent it hangs off when it is not one itself, and how
-    # many rows hang off it when it is.
+    # Set on the subject routes only. What the row is (consent | access), the
+    # consent it hangs off when it is not one itself, and how many rows hang
+    # off it when it is.
     record_kind: Optional[str] = None
     derived_from: Optional[str] = None
     activity_count: Optional[int] = None

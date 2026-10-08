@@ -121,8 +121,8 @@ export const api = {
       `${V1}/my/consent-requests?status=${encodeURIComponent(status || "all")}&size=${size}`
     ),
 
-  // view "consents" drops the per-registry grants and access records an
-  // aggregated fetch writes under each decision; "all" is every row.
+  // view "consents" drops the access records each partner fetch writes under
+  // a decision; "all" is every row.
   myConsentsPage: (status?: string, size = 100, view: "all" | "consents" = "all") =>
     request<Paginated<Artefact>>(
       `${V1}/my/consents?size=${size}&view=${view}${

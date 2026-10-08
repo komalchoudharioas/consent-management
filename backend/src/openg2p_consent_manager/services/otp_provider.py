@@ -94,8 +94,8 @@ class FaydaOtpProvider:
 
     The Gen 1 service keeps its transactions in a module-level dict, so a
     restart loses them all and a verify then answers `Unknown transactionID`.
-    Here the transaction IS the aggregation row, so it is exactly as durable as
-    the request it belongs to.
+    Here the transaction IS the consent-request row, so it is exactly as
+    durable as the request it belongs to.
     """
 
     name = "fayda"
@@ -113,9 +113,8 @@ class FaydaOtpProvider:
         return str(mapped) if mapped else subject_value
 
     async def issue(self, request, destination: str) -> None:
-        # The transaction IS the row, whichever row it is: an aggregation
-        # carries a correlation_id, a consent request does not.
-        transaction_id = getattr(request, "correlation_id", None) or request.id
+        # The transaction IS the consent-request row.
+        transaction_id = request.id
         individual_id = self._individual_id(destination)
         code = fayda_otp.generate_otp(_config.otp_length)
 
@@ -130,7 +129,7 @@ class FaydaOtpProvider:
         # this, so a verify naming a different individual cannot match.
         request.otp_destination = individual_id
         request.otp_provider = self.name
-        # See models/aggregation.py: plaintext only under the debug flag.
+        # See models/consent.py: plaintext only under the debug flag.
         request.otp_debug_code = code if _config.otp_debug_enabled else None
 
         await _publish(request, code, individual_id, _config.fayda_identifier_type)
@@ -145,8 +144,7 @@ class FaydaOtpProvider:
 
     async def verify(self, request, code: str) -> None:
         _check_window(request)
-        transaction_id = (request.otp_reference
-                          or getattr(request, "correlation_id", None) or request.id)
+        transaction_id = request.otp_reference or request.id
         individual_id = self._individual_id(request.subject_id_value)
         try:
             fayda_otp.verify_otp(
@@ -163,7 +161,7 @@ class FaydaOtpProvider:
             if exc.reason == "otp_subject_mismatch":
                 # Our bug, not the subject's: the verify named a different
                 # individual than the one the transaction was opened for.
-                _logger.error("Aggregation %s: %s (opened for '%s', verified as '%s')",
+                _logger.error("Request %s: %s (opened for '%s', verified as '%s')",
                               request.id, exc.message, request.otp_destination,
                               individual_id)
                 raise OtpError(500, exc.reason, exc.message) from exc

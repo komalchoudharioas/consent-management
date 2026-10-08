@@ -9,7 +9,6 @@ _config = Settings.get_config()
 from openg2p_fastapi_common.app import Initializer as BaseInitializer
 
 from .controllers import (
-    AggregatorController,
     AweController,
     DecisionsController,
     LifecycleController,
@@ -19,7 +18,6 @@ from .controllers import (
     WellKnownController,
 )
 from .models import (
-    AggregationRequest,
     AuditLog,
     AuthContext,
     AweProcessedEvent,
@@ -33,7 +31,6 @@ from .models import (
 )
 from .services import (
     OtpPublisher,
-    AggregatorService,
     AweClient,
     AweWebhookService,
     ConsentService,
@@ -43,7 +40,6 @@ from .services import (
     PartnerService,
     PolicyService,
     ReceiptService,
-    RegistryClient,
     VerificationService,
 )
 
@@ -67,8 +63,6 @@ class Initializer(BaseInitializer):
         AweWebhookService()  # depends on PartnerService
         OtpPublisher()   # no-op unless otp_publish_enabled
         OtpService()
-        RegistryClient()   # depends on CryptoService
-        AggregatorService()  # depends on Verification, Registry, Otp, Crypto
 
         # Controllers — mounted per API audience (the platform's 4-API pattern).
         # One image, one deployable per audience; each mounts only its routes.
@@ -83,8 +77,6 @@ class Initializer(BaseInitializer):
             # no Keycloak. Serves /validate, status, receipts, JWKS.
             VerificationController().post_init()
             WellKnownController().post_init()
-            if _config.aggregator_enabled:
-                AggregatorController().post_init()
         if staff:
             # STAFF api — Keycloak staff realm. Policy admin, approvals, decisions.
             PartnerController().post_init()
@@ -94,46 +86,6 @@ class Initializer(BaseInitializer):
             # BENEFICIARY api — Keycloak beneficiary realm. /my/* + origination.
             SubjectController().post_init()
             LifecycleController().post_init()
-
-    # ── the aggregation queue ───────────────────────────────────────────────
-    #
-    # These are the platform's lifespan hooks, called from the base
-    # Initializer's ``fastapi_app_lifespan``. They are the only ones that fire:
-    # because that lifespan is passed to FastAPI explicitly, Starlette ignores
-    # any ``@app.on_event`` handler registered alongside it — silently, with
-    # nothing in the log to say the handler was dropped.
-    #
-    # With ``kafka_consumers_in_app`` the API process also consumes, which is
-    # the single-process development shape and matches how the platform's Audit
-    # Manager runs producer and consumer in one service. In production set it
-    # false and run ``python -m openg2p_consent_manager.worker``: the point of
-    # moving the fan-out off the request path is lost if the registry queries
-    # still share an event loop with the portal serving the subject.
-
-    async def fastapi_app_startup(self, app):
-        await super().fastapi_app_startup(app)
-        if not _config.kafka_enabled:
-            return
-        from .kafka_bus.bus import bus
-
-        await bus.start()
-        if _config.kafka_consumers_in_app:
-            from .kafka_bus.consumers import runner
-
-            await runner.start()
-        else:
-            _logger.info("kafka_consumers_in_app=false - this process publishes "
-                         "only; run `python -m openg2p_consent_manager.worker`")
-
-    async def fastapi_app_shutdown(self, app):
-        if _config.kafka_enabled:
-            from .kafka_bus.bus import bus
-            from .kafka_bus.consumers import runner
-
-            if _config.kafka_consumers_in_app:
-                await runner.stop()
-            await bus.stop()
-        await super().fastapi_app_shutdown(app)
 
     def migrate_database(self, args):
         super().migrate_database(args)
@@ -151,8 +103,7 @@ class Initializer(BaseInitializer):
                 DecisionLog,
                 AuditLog,
                 AweProcessedEvent,
-                AggregationRequest,
-            ):
+                        ):
                 await model.create_migrate()
 
             # create_migrate() only creates missing tables; it does not ALTER an
@@ -196,31 +147,9 @@ class Initializer(BaseInitializer):
                         "ON partner_policies (awe_request_id)"
                     )
                 )
-                # The OTP backend became pluggable after the table was first
-                # created, so carry the two columns onto an existing database.
-                await conn.execute(
-                    text(
-                        "ALTER TABLE aggregation_requests ADD COLUMN IF NOT EXISTS "
-                        "otp_provider VARCHAR(50)"
-                    )
-                )
-                await conn.execute(
-                    text(
-                        "ALTER TABLE aggregation_requests ADD COLUMN IF NOT EXISTS "
-                        "otp_reference VARCHAR(255)"
-                    )
-                )
-                await conn.execute(
-                    text(
-                        "ALTER TABLE aggregation_requests ADD COLUMN IF NOT EXISTS "
-                        "otp_debug_code VARCHAR(16)"
-                    )
-                )
                 # The OTP moved onto the consent screen: the subject authenticates
-                # once, where they grant, instead of once there and again at the
-                # fetch. consent_requests therefore carries the same otp_* shape
-                # aggregation_requests does, and an aggregation that had to raise
-                # a consent request points at it.
+                # once, where they grant. consent_requests therefore carries the
+                # otp_* state the provider writes.
                 for column, ddl in (
                     ("otp_hash", "VARCHAR(128)"),
                     ("otp_expires_at", "TIMESTAMPTZ"),
@@ -238,19 +167,6 @@ class Initializer(BaseInitializer):
                             "%s %s" % (column, ddl)
                         )
                     )
-                await conn.execute(
-                    text(
-                        "ALTER TABLE aggregation_requests ADD COLUMN IF NOT EXISTS "
-                        "consent_request_id VARCHAR"
-                    )
-                )
-                await conn.execute(
-                    text(
-                        "CREATE INDEX IF NOT EXISTS "
-                        "ix_aggregation_requests_consent_request_id "
-                        "ON aggregation_requests (consent_request_id)"
-                    )
-                )
                 # Which authentication a partner's subjects must perform.
                 #
                 # The fetch-time OTP used to be unconditional, so every policy
@@ -280,24 +196,16 @@ class Initializer(BaseInitializer):
                         "END $$;"
                     )
                 )
-                await conn.execute(
-                    text(
-                        "ALTER TABLE aggregation_requests ADD COLUMN IF NOT EXISTS "
-                        "otp_required BOOLEAN NOT NULL DEFAULT TRUE"
-                    )
-                )
                 # Why a partner may hold the data. Every policy written before
                 # this one required a subject grant, so "consent" is both the
                 # default and the correct backfill - the column is NOT NULL so
                 # that a basis can never be absent from the record.
-                for _table in ("partner_policies", "aggregation_requests"):
-                    await conn.execute(
-                        text(
-                            "ALTER TABLE %s ADD COLUMN IF NOT EXISTS "
-                            "lawful_basis VARCHAR(40) NOT NULL DEFAULT 'consent'"
-                            % _table
-                        )
+                await conn.execute(
+                    text(
+                        "ALTER TABLE partner_policies ADD COLUMN IF NOT EXISTS "
+                        "lawful_basis VARCHAR(40) NOT NULL DEFAULT 'consent'"
                     )
+                )
                 # A policy under a non-consent basis must carry no auth method
                 # (PolicyUpsert refuses it). Rows written before that rule -
                 # some re-armed to 'otp' by the old IS NULL backfill above -
@@ -309,31 +217,6 @@ class Initializer(BaseInitializer):
                         "UPDATE partner_policies SET required_auth_method = NULL "
                         " WHERE lawful_basis <> 'consent' "
                         "   AND required_auth_method IS NOT NULL"
-                    )
-                )
-                # The fan-out and the callback moved onto Kafka topics, so a
-                # row now records which worker holds it and how many times the
-                # work has been started. Existing rows get the defaults, which
-                # read correctly for work that has already finished.
-                for column, ddl in (
-                    ("fetch_attempts", "INTEGER NOT NULL DEFAULT 0"),
-                    ("claimed_by", "VARCHAR(64)"),
-                    ("claimed_at", "TIMESTAMPTZ"),
-                    ("next_retry_at", "TIMESTAMPTZ"),
-                ):
-                    await conn.execute(
-                        text(
-                            "ALTER TABLE aggregation_requests ADD COLUMN IF NOT "
-                            "EXISTS %s %s" % (column, ddl)
-                        )
-                    )
-                # The reaper and the queue depth both filter on (status,
-                # claimed_at); without this they sequentially scan the table.
-                await conn.execute(
-                    text(
-                        "CREATE INDEX IF NOT EXISTS "
-                        "ix_aggregation_requests_status_claimed_at "
-                        "ON aggregation_requests (status, claimed_at)"
                     )
                 )
             _logger.info("Database migration complete")

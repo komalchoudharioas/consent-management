@@ -71,8 +71,7 @@ class LifecycleController(BaseController):
             responses={200: {"model": AuthenticateResponse}}, methods=["POST"],
         )
         if _config.otp_debug_enabled:
-            # Same bargain as the aggregation route: this hands out the code and
-            # defeats the second factor. It exists so the flow can be driven
+            # This hands out the code and defeats the second factor. It exists so the flow can be driven
             # from a tool that cannot read the service log.
             _logger.warning(
                 "otp_debug_enabled=true - GET /consent/v1/consent-requests/{id}/otp "
