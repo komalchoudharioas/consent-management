@@ -144,6 +144,24 @@ def require_role(role: str):
     return _checker
 
 
+def require_any_role(*roles: str):
+    """Dependency factory — gate an endpoint on holding at least one of ``roles``."""
+
+    async def _checker(
+        identity: CallerIdentity = Depends(current_identity),
+    ) -> CallerIdentity:
+        if not _config.auth_enabled:
+            return identity
+        if not any(role in identity.roles for role in roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="One of roles %s required" % ", ".join(repr(r) for r in roles),
+            )
+        return identity
+
+    return _checker
+
+
 async def get_current_subject(
     identity: CallerIdentity = Depends(current_identity),
 ) -> Dict[str, str]:

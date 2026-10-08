@@ -180,6 +180,17 @@ class ConsentService(BaseService):
                         claimed_by=None, claimed_at=None, next_retry_at=None)
             )
             cancelled = result.rowcount or 0
+            # And in the Aggregation Layer when it runs as its own service.
+            # Cancelling early is the safe direction, so this need not wait for
+            # the caller's commit.
+            from . import aggregation_events
+
+            aggregation_events.publish(aggregation_events.EVENT_WITHDRAWN, {
+                "consent_id": artefact.id,
+                "partner_id": artefact.partner_id,
+                "subject_id": {"type": artefact.subject_id_type,
+                               "value": artefact.subject_id_value},
+            })
         _logger.info("Consent %s withdrawn: %d derived row(s) revoked, %d "
                      "in-flight aggregation(s) cancelled",
                      artefact.id, len(children), cancelled)
@@ -301,8 +312,12 @@ class ConsentService(BaseService):
             )).scalars().all()}
 
         def is_agg(ctx_id: Optional[str]) -> bool:
+            # The in-process aggregator signs as aggregator_issuer; the external
+            # Aggregation Layer has its own issuer, but both record the
+            # aggregation id in the claims.
             ctx = ctxs.get(ctx_id) if ctx_id else None
-            return bool(ctx and ctx.auth_provider == agg_issuer)
+            return bool(ctx and (ctx.auth_provider == agg_issuer
+                                 or "aggregation_id" in (ctx.verified_claims or {})))
 
         agg_ids = {ctxs[c].consent_request_id for c in ctx_ids if is_agg(c)}
         aggs: Dict[str, AggregationRequest] = {}
@@ -331,7 +346,21 @@ class ConsentService(BaseService):
                   if kinds[a.id] == KIND_CONSENT and a.auth_context_id}
         by_request = {ctxs[c].consent_request_id: a for c, a in by_ctx.items() if c in ctxs}
 
+        by_id = {a.id: a for a in rows}
+
         def root_of_aggregation(ctx_id: str) -> Optional[str]:
+            # The external Aggregation Layer states the link when it records the
+            # grant (POST /consent/v1/grants), so nothing is read from its tables.
+            claims = ctxs[ctx_id].verified_claims or {}
+            if claims.get("consent_request_id"):
+                return by_request.get(claims["consent_request_id"])
+            if claims.get("root_consent_id"):
+                obj = by_id.get(claims["root_consent_id"])
+                if obj is None:
+                    return None
+                if kinds[obj.id] == KIND_CONSENT:
+                    return obj.id
+                return by_ctx.get(obj.auth_context_id)
             agg = aggs.get(ctxs[ctx_id].consent_request_id)
             if agg is None:
                 return None

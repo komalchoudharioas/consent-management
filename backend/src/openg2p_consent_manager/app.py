@@ -9,6 +9,7 @@ _config = Settings.get_config()
 from openg2p_fastapi_common.app import Initializer as BaseInitializer
 
 from .controllers import (
+    AggregationLayerController,
     AggregatorController,
     AweController,
     DecisionsController,
@@ -33,6 +34,7 @@ from .models import (
 )
 from .services import (
     OtpPublisher,
+    AggregationLayerService,
     AggregatorService,
     AweClient,
     AweWebhookService,
@@ -69,6 +71,7 @@ class Initializer(BaseInitializer):
         OtpService()
         RegistryClient()   # depends on CryptoService
         AggregatorService()  # depends on Verification, Registry, Otp, Crypto
+        AggregationLayerService()
 
         # Controllers — mounted per API audience (the platform's 4-API pattern).
         # One image, one deployable per audience; each mounts only its routes.
@@ -83,6 +86,8 @@ class Initializer(BaseInitializer):
             # no Keycloak. Serves /validate, status, receipts, JWKS.
             VerificationController().post_init()
             WellKnownController().post_init()
+            # Service APIs for the external Aggregation Layer (service role).
+            AggregationLayerController().post_init()
             if _config.aggregator_enabled:
                 AggregatorController().post_init()
         if staff:

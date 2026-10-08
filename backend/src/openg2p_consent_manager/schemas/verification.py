@@ -76,4 +76,9 @@ class Decision(BaseModel):
     # whole of the authority). Carried so callers can record WHICH it was
     # rather than inferring it from the absence of something.
     lawful_basis: str = "consent"
+    # Which CM binding the decision was made for. Set on a permit so a caller
+    # outside the CM (the Aggregation Layer) learns who the partner is from the
+    # PDP itself instead of reading the artefact table.
+    partner_id: Optional[str] = None
+    partner_audience: Optional[str] = None
     evaluated_at: datetime

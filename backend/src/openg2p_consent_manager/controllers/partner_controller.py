@@ -5,7 +5,7 @@ from fastapi import Depends, Query
 from fastapi.responses import JSONResponse
 from openg2p_fastapi_common.controller import BaseController
 
-from ..auth import require_role
+from ..auth import require_any_role, require_role
 from ..config import Settings
 from ..models import PolicyStatus
 from ..schemas.partner import (
@@ -53,6 +53,17 @@ class PartnerController(BaseController):
 
         # All partner/policy admin endpoints require the admin role.
         admin = [Depends(require_role(_config.auth_admin_role))]
+        # Read-only lookups a platform service (the Aggregation Layer) needs
+        # also accept the service role, so that client never holds admin.
+        admin_or_service = [Depends(require_any_role(
+            _config.auth_admin_role, _config.auth_service_role))]
+
+        # Before "/{partner_id}..." so the literal segment is matched first.
+        self.router.add_api_route(
+            "/by-audience/{audience}", self.get_partner_by_audience,
+            dependencies=admin_or_service,
+            responses={200: {"model": PartnerResponse}}, methods=["GET"],
+        )
 
         self.router.add_api_route(
             "", self.list_partners, dependencies=admin,
@@ -75,7 +86,7 @@ class PartnerController(BaseController):
             responses={200: {"model": PolicyResponse}}, methods=["PUT"],
         )
         self.router.add_api_route(
-            "/{partner_id}/policy", self.get_policy, dependencies=admin,
+            "/{partner_id}/policy", self.get_policy, dependencies=admin_or_service,
             responses={200: {"model": PolicyResponse}}, methods=["GET"],
         )
         self.router.add_api_route(
@@ -94,6 +105,12 @@ class PartnerController(BaseController):
     async def create_partner(self, data: PartnerCreate):
         # A binding is created active; partner identity onboarding is PM's job.
         partner = await self.partners.create_partner(data)
+        return PartnerResponse.model_validate(partner)
+
+    async def get_partner_by_audience(self, audience: str):
+        partner = await self.partners.get_partner_by_audience(audience)
+        if partner is None:
+            return _NOT_FOUND
         return PartnerResponse.model_validate(partner)
 
     async def get_partner(self, partner_id: str):

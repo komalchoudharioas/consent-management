@@ -142,6 +142,22 @@ class Settings(BaseSettings):
     # the approver's own JWT.
     auth_approver_role: str = "CONSENT_MANAGER_APPROVER"
 
+    # Role held by trusted platform services (the Aggregation Layer's Keycloak
+    # client) on the service-to-service APIs: partner lookup, policy read,
+    # recording a grant, reading what a consent request granted.
+    auth_service_role: str = "CONSENT_MANAGER_SERVICE"
+
+    # ── Aggregation Layer events ────────────────────────────────────────────
+    # The Aggregation Layer runs as its own service. It learns that a consent
+    # request it raised was approved, or that a consent was withdrawn, from
+    # these events (POSTed, HMAC-signed). Empty URL sends nothing.
+    aggregation_layer_events_url: str = ""  # e.g. http://aggregation-layer:8100/aggregation/v1/cm-events
+    aggregation_layer_events_hmac_secret: str = ""
+    aggregation_layer_events_timeout: float = 10.0
+    # Attempts per event, spaced 1s, 5s, 25s ... An event that still fails is
+    # logged; the approval or withdrawal itself is never rolled back.
+    aggregation_layer_events_attempts: int = 4
+
     # ── Approval Workflow Engine (AWE) integration ──────────────────────────
     # Widening a partner's data-share POLICY is gated behind human approval in the
     # shared, per-environment AWE. CM is a *caller service*: on a widening it

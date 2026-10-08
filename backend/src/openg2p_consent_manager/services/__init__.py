@@ -1,4 +1,5 @@
 from . import field_catalog
+from .aggregation_layer_service import AggregationLayerService
 from .aggregator_service import AggregationError, AggregatorService
 from .awe_client import AweClient, AweClientError
 from .awe_webhook_service import AweWebhookService, WebhookError
@@ -22,6 +23,7 @@ from .verification_service import VerificationService
 __all__ = [
     "CryptoService",
     "AggregatorService",
+    "AggregationLayerService",
     "AggregationError",
     "OtpPublisher",
     "OtpService",

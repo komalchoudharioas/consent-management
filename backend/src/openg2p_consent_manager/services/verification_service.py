@@ -262,6 +262,7 @@ class VerificationService(BaseService):
             subject_id=SubjectId(type=artefact.subject_id_type, value=artefact.subject_id_value),
             effective_data_scopes=artefact.effective_data_scopes,
             valid_until=artefact.valid_until, policy_version=artefact.policy_version,
+            partner_id=artefact.partner_id,
             evaluated_at=now,
         )
 
@@ -312,6 +313,8 @@ class VerificationService(BaseService):
             effective_data_scopes=result.effective_scopes,
             valid_until=artefact.valid_until, policy_version=result.policy_version,
             lawful_basis=basis,
+            partner_id=partner.id,
+            partner_audience=partner.audience,
             evaluated_at=now,
         )
 

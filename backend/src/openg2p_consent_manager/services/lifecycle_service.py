@@ -273,6 +273,11 @@ class LifecycleService(BaseService):
         from .aggregator_service import AggregatorService
 
         await AggregatorService.get_component().release_for_consent_request(request_id)
+        # The same news for the Aggregation Layer when it runs as its own service.
+        from . import aggregation_events
+
+        aggregation_events.publish(aggregation_events.EVENT_APPROVED,
+                                   {"consent_request_id": request_id})
         return artefact
 
     async def deny(self, request_id: str, reason: Optional[str]) -> ConsentRequest:

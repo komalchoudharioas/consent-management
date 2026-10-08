@@ -52,6 +52,14 @@ class PartnerService(BaseService):
         async with async_session()() as session:
             return await session.get(Partner, partner_id)
 
+    async def get_partner_by_audience(self, audience: str) -> Optional[Partner]:
+        """The binding for an audience (newest if, unusually, there are several)."""
+        async with async_session()() as session:
+            result = await session.execute(
+                select(Partner).where(Partner.audience == audience)
+                .order_by(Partner.created_at.desc()))
+            return result.scalars().first()
+
     async def list_partners(
         self, controller_id: Optional[str] = None, status: Optional[str] = None
     ) -> list:
